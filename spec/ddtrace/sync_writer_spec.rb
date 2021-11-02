@@ -110,6 +110,13 @@ RSpec.describe Datadog::SyncWriter do
           .with([unfiltered_trace])
       end
     end
+
+    it 'publishes after_send event' do
+      expect(sync_writer.events.after_send)
+        .to receive(:publish)
+              .with(sync_writer, match_array(be_a(Datadog::Transport::HTTP::Traces::Response)))
+      write
+    end
   end
 
   describe '#stop' do

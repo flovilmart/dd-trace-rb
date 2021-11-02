@@ -411,7 +411,7 @@ module Datadog
 
     # TODO: Move this kind of configuration building out of the tracer.
     #       Tracer should not have this kind of knowledge of writer.
-    def configure_writer(options = {})
+    #def configure_writer(options = {})
       # sampler = options.fetch(:sampler, nil)
       # priority_sampling = options.fetch(:priority_sampling, nil)
       # writer = options.fetch(:writer, nil)
@@ -445,7 +445,7 @@ module Datadog
       # @writer.stop unless writer.nil?
       #
       # @writer = writer || Writer.new(writer_options)
-    end
+    #end
 
     def activate_priority_sampling!(base_sampler = nil)
       @sampler = if base_sampler.is_a?(PrioritySampler)

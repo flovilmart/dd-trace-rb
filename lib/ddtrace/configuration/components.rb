@@ -65,11 +65,14 @@ module Datadog
             writer = build_writer(settings, agent_settings)
           end
 
+          subscribe_to_writer_events!(writer, sampler)
+
           Tracer.new(
             default_service: settings.service,
             enabled: settings.tracer.enabled,
             context_flush: context_flush,
             sampler: sampler,
+
             writer: writer,
             tags: build_tracer_tags(settings),
           )
@@ -108,21 +111,40 @@ module Datadog
           end
         end
 
-        def build_writer(settings, agent_settings)
-          writer = settings.tracer.writer
-          return writer if writer
-
-          Writer.new(agent_settings: agent_settings, **settings.tracer.writer_options)
-        end
-
         def ensure_priority_sampling(sampler = nil)
           if sampler.is_a?(PrioritySampler)
             sampler
           else
             PrioritySampler.new(
-             base_sampler: sampler,
-             post_sampler: Sampling::RuleSampler.new
+              base_sampler: sampler,
+              post_sampler: Sampling::RuleSampler.new
             )
+          end
+        end
+
+        def build_writer(settings, agent_settings)
+          if (writer = settings.tracer.writer)
+            return writer
+          end
+
+          Writer.new(agent_settings: agent_settings, **settings.tracer.writer_options)
+        end
+
+        def subscribe_to_writer_events!(writer, sampler)
+          return unless writer.respond_to?(:events) # Check if it's a custom, external writer
+
+          writer.events.after_send.subscribe(:record_environment_information) do |_, responses|
+            Diagnostics::EnvironmentLogger.log!(responses)
+          end
+
+          return unless sampler.is_a?(Datadog::PrioritySampler)
+
+          writer.events.after_send.subscribe(:update_priority_sampler_rates) do |_, responses|
+            response = responses.last
+
+            next unless response && !response.internal_error? && response.service_rates
+
+            sampler.update(response.service_rates)
           end
         end
 

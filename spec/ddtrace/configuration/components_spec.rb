@@ -331,7 +331,7 @@ RSpec.describe Datadog::Configuration::Components do
     context 'given settings' do
       shared_examples_for 'new tracer' do
         let(:tracer) { instance_double(Datadog::Tracer) }
-        let(:writer) { instance_double(Datadog::Writer) }
+        let(:writer) { Datadog::Writer.new }
         let(:context_flush) { be_a(Datadog::ContextFlush::Finished) }
         let(:default_options) do
           {
@@ -340,6 +340,7 @@ RSpec.describe Datadog::Configuration::Components do
             context_flush: context_flush,
             tags: settings.tags,
             sampler: lambda do |sampler|
+              expect(sampler).to be_a(Datadog::PrioritySampler)
               expect(sampler.pre_sampler).to be_a(Datadog::AllSampler)
               expect(sampler.priority_sampler.rate_limiter.rate).to eq(settings.sampling.rate_limit)
               expect(sampler.priority_sampler.default_sampler).to be_a(Datadog::RateByServiceSampler)
@@ -361,11 +362,38 @@ RSpec.describe Datadog::Configuration::Components do
              .and_return(writer)
         end
 
+        after do
+          writer.stop
+        end
+
         it { is_expected.to be(tracer) }
       end
 
+      shared_examples 'event publishing writer' do
+        it 'subscribes to writer events' do
+          expect(writer.events.after_send).to receive(:subscribe).with(:record_environment_information)
+          build_tracer
+        end
+      end
+
+      shared_examples 'event publishing writer and priority sampler' do
+        it_behaves_like 'event publishing writer'
+
+        before do
+          allow(writer.events.after_send).to receive(:subscribe).with(:record_environment_information)
+          allow(writer.events.after_send).to receive(:subscribe).with(:update_priority_sampler_rates)
+        end
+
+        it 'subscribes to writer events' do
+          expect(writer.events.after_send).to receive(:subscribe).with(:update_priority_sampler_rates)
+          build_tracer
+        end
+      end
+
       context 'by default' do
-        it_behaves_like 'new tracer'
+        it_behaves_like 'new tracer' do
+          it_behaves_like 'event publishing writer and priority sampler'
+        end
       end
 
       context 'with :enabled' do
@@ -379,6 +407,7 @@ RSpec.describe Datadog::Configuration::Components do
 
         it_behaves_like 'new tracer' do
           let(:options) { { enabled: enabled } }
+          it_behaves_like 'event publishing writer and priority sampler'
         end
       end
 
@@ -393,6 +422,7 @@ RSpec.describe Datadog::Configuration::Components do
 
         it_behaves_like 'new tracer' do
           let(:options) { { tags: { 'env' => env } } }
+          it_behaves_like 'event publishing writer and priority sampler'
         end
       end
 
@@ -407,6 +437,7 @@ RSpec.describe Datadog::Configuration::Components do
 
         it_behaves_like 'new tracer' do
           let(:options) { { context_flush: be_a(Datadog::ContextFlush::Partial) } }
+          it_behaves_like 'event publishing writer and priority sampler'
         end
 
         context 'with :partial_flush :min_spans_threshold' do
@@ -423,6 +454,8 @@ RSpec.describe Datadog::Configuration::Components do
               { context_flush: be_a(Datadog::ContextFlush::Partial) &
                 have_attributes(min_spans_for_partial: min_spans_threshold) }
             end
+
+            it_behaves_like 'event publishing writer and priority sampler'
           end
         end
       end
@@ -451,6 +484,7 @@ RSpec.describe Datadog::Configuration::Components do
 
               it_behaves_like 'new tracer' do
                 let(:options) { { sampler: sampler } }
+                it_behaves_like 'event publishing writer and priority sampler'
               end
             end
 
@@ -459,11 +493,12 @@ RSpec.describe Datadog::Configuration::Components do
 
               context 'wraps sampler in a priority sampler' do
                 it_behaves_like 'new tracer' do
-
                   let(:options) { { sampler: be_a(Datadog::PrioritySampler) & have_attributes(
                     pre_sampler: sampler,
                     priority_sampler: be_a(Datadog::Sampling::RuleSampler)
                   ) } }
+
+                  it_behaves_like 'event publishing writer and priority sampler'
                 end
               end
             end
@@ -488,6 +523,7 @@ RSpec.describe Datadog::Configuration::Components do
 
             it_behaves_like 'new tracer' do
               let(:options) { { sampler: sampler } }
+              it_behaves_like 'event publishing writer'
             end
           end
         end
@@ -504,6 +540,7 @@ RSpec.describe Datadog::Configuration::Components do
 
         it_behaves_like 'new tracer' do
           let(:options) { { default_service: service } }
+          it_behaves_like 'event publishing writer and priority sampler'
         end
       end
 
@@ -523,6 +560,7 @@ RSpec.describe Datadog::Configuration::Components do
 
         it_behaves_like 'new tracer' do
           let(:options) { { tags: tags } }
+          it_behaves_like 'event publishing writer and priority sampler'
         end
 
         context 'with conflicting :env' do
@@ -536,6 +574,7 @@ RSpec.describe Datadog::Configuration::Components do
 
           it_behaves_like 'new tracer' do
             let(:options) { { tags: tags.merge('env' => env) } }
+            it_behaves_like 'event publishing writer and priority sampler'
           end
         end
 
@@ -550,6 +589,7 @@ RSpec.describe Datadog::Configuration::Components do
 
           it_behaves_like 'new tracer' do
             let(:options) { { tags: tags.merge('version' => version) } }
+            it_behaves_like 'event publishing writer and priority sampler'
           end
         end
       end
@@ -564,6 +604,14 @@ RSpec.describe Datadog::Configuration::Components do
 
           context 'set to true' do
             let(:enabled) { true }
+            let(:sync_writer) { Datadog::SyncWriter.new }
+
+            before do
+              expect(Datadog::SyncWriter)
+                .to receive(:new)
+                      .with(agent_settings: agent_settings, **writer_options)
+                      .and_return(writer)
+            end
 
             context 'and :context_flush' do
               before do
@@ -582,6 +630,9 @@ RSpec.describe Datadog::Configuration::Components do
                       writer: kind_of(Datadog::SyncWriter)
                     }
                   end
+                  let(:writer) { sync_writer }
+
+                  it_behaves_like 'event publishing writer'
                 end
               end
 
@@ -596,6 +647,9 @@ RSpec.describe Datadog::Configuration::Components do
                       writer: kind_of(Datadog::SyncWriter)
                     }
                   end
+                  let(:writer) { sync_writer }
+
+                  it_behaves_like 'event publishing writer'
                 end
               end
             end
@@ -608,23 +662,18 @@ RSpec.describe Datadog::Configuration::Components do
               end
 
               context 'are set' do
-                let(:sync_writer) { instance_double(Datadog::SyncWriter) }
                 let(:writer_options) { { foo: :bar } }
 
                 it_behaves_like 'new tracer' do
-                  before do
-                    expect(Datadog::SyncWriter)
-                      .to receive(:new)
-                      .with(agent_settings: agent_settings, **writer_options)
-                      .and_return(sync_writer)
-                  end
-
                   let(:options) do
                     {
                       sampler: kind_of(Datadog::AllSampler),
-                      writer: sync_writer
+                      writer: writer
                     }
                   end
+                  let(:writer) { sync_writer }
+
+                  it_behaves_like 'event publishing writer'
                 end
               end
             end
@@ -659,6 +708,16 @@ RSpec.describe Datadog::Configuration::Components do
 
         it_behaves_like 'new tracer' do
           let(:options) { { writer: writer } }
+        end
+
+        context 'that publishes events' do
+          it_behaves_like 'new tracer' do
+            let(:options) { { writer: writer } }
+            let(:writer) { Datadog::Writer.new }
+            after { writer.stop }
+
+            it_behaves_like 'event publishing writer and priority sampler'
+          end
         end
       end
 

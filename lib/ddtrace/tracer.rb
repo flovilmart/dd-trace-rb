@@ -374,7 +374,7 @@ module Datadog
       @writer.write(trace)
       trace_completed.publish(trace)
     end
-    
+
     def activate_priority_sampling!(base_sampler = nil)
       @sampler = if base_sampler.is_a?(PrioritySampler)
                    base_sampler

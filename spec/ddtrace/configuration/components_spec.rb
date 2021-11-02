@@ -358,8 +358,8 @@ RSpec.describe Datadog::Configuration::Components do
             .and_return(tracer)
 
           allow(Datadog::Writer).to receive(:new)
-             .with(agent_settings: agent_settings, **writer_options)
-             .and_return(writer)
+            .with(agent_settings: agent_settings, **writer_options)
+            .and_return(writer)
         end
 
         after do
@@ -432,7 +432,7 @@ RSpec.describe Datadog::Configuration::Components do
         before do
           allow(settings.tracer.partial_flush)
             .to receive(:enabled)
-                  .and_return(enabled)
+            .and_return(enabled)
         end
 
         it_behaves_like 'new tracer' do
@@ -446,7 +446,7 @@ RSpec.describe Datadog::Configuration::Components do
           before do
             allow(settings.tracer.partial_flush)
               .to receive(:min_spans_threshold)
-                    .and_return(min_spans_threshold)
+              .and_return(min_spans_threshold)
           end
 
           it_behaves_like 'new tracer' do
@@ -464,7 +464,7 @@ RSpec.describe Datadog::Configuration::Components do
         before do
           allow(settings.tracer)
             .to receive(:priority_sampling)
-                  .and_return(priority_sampling)
+            .and_return(priority_sampling)
         end
 
         context 'enabled' do
@@ -476,7 +476,7 @@ RSpec.describe Datadog::Configuration::Components do
             before do
               allow(settings.tracer)
                 .to receive(:sampler)
-                      .and_return(sampler)
+                .and_return(sampler)
             end
 
             context 'that is a priority sampler' do
@@ -493,10 +493,12 @@ RSpec.describe Datadog::Configuration::Components do
 
               context 'wraps sampler in a priority sampler' do
                 it_behaves_like 'new tracer' do
-                  let(:options) { { sampler: be_a(Datadog::PrioritySampler) & have_attributes(
-                    pre_sampler: sampler,
-                    priority_sampler: be_a(Datadog::Sampling::RuleSampler)
-                  ) } }
+                  let(:options) do
+                    { sampler: be_a(Datadog::PrioritySampler) & have_attributes(
+                      pre_sampler: sampler,
+                      priority_sampler: be_a(Datadog::Sampling::RuleSampler)
+                    ) }
+                  end
 
                   it_behaves_like 'event publishing writer and priority sampler'
                 end
@@ -516,7 +518,7 @@ RSpec.describe Datadog::Configuration::Components do
             before do
               allow(settings.tracer)
                 .to receive(:sampler)
-                      .and_return(sampler)
+                .and_return(sampler)
             end
 
             let(:sampler) { double('sampler') }
@@ -609,8 +611,8 @@ RSpec.describe Datadog::Configuration::Components do
             before do
               expect(Datadog::SyncWriter)
                 .to receive(:new)
-                      .with(agent_settings: agent_settings, **writer_options)
-                      .and_return(writer)
+                .with(agent_settings: agent_settings, **writer_options)
+                .and_return(writer)
             end
 
             context 'and :context_flush' do
@@ -728,7 +730,7 @@ RSpec.describe Datadog::Configuration::Components do
           before do
             expect(settings.tracer)
               .to receive(:writer_options)
-                    .and_return(writer_options)
+              .and_return(writer_options)
           end
         end
 

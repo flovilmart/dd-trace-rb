@@ -542,8 +542,8 @@ RSpec.describe 'Tracer integration tests' do
         let(:on_build) do
           double('on_build').tap do |double|
             expect(double).to receive(:call)
-                                .with(kind_of(Datadog::Transport::HTTP::Builder))
-                                .at_least(1)
+              .with(kind_of(Datadog::Transport::HTTP::Builder))
+              .at_least(1)
           end
         end
 

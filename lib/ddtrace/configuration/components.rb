@@ -93,21 +93,19 @@ module Datadog
             else
               ensure_priority_sampling(sampler)
             end
+          elsif settings.tracer.priority_sampling == false
+            Sampling::RuleSampler.new(
+              rate_limit: settings.sampling.rate_limit,
+              default_sample_rate: settings.sampling.default_rate
+            )
           else
-            if settings.tracer.priority_sampling == false
-              Sampling::RuleSampler.new(
+            PrioritySampler.new(
+              base_sampler: AllSampler.new,
+              post_sampler: Sampling::RuleSampler.new(
                 rate_limit: settings.sampling.rate_limit,
                 default_sample_rate: settings.sampling.default_rate
               )
-            else
-              PrioritySampler.new(
-                base_sampler: AllSampler.new,
-                post_sampler: Sampling::RuleSampler.new(
-                  rate_limit: settings.sampling.rate_limit,
-                  default_sample_rate: settings.sampling.default_rate
-                )
-              )
-            end
+            )
           end
         end
 
@@ -209,11 +207,7 @@ module Datadog
 
         def build_test_mode_context_flush(settings)
           # If context flush behavior is provided, use it instead.
-          if settings.test_mode.context_flush
-            settings.test_mode.context_flush
-          else
-            build_context_flush(settings)
-          end
+          settings.test_mode.context_flush || build_context_flush(settings)
         end
 
         def build_test_mode_sampler
